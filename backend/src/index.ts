@@ -1,50 +1,128 @@
 require("dotenv").config();
+import express from "express";
+import { BASE_PROMPT, getSystemPrompt } from "./prompts";
+import { basePrompt as nodeBasePrompt } from "./defaults/node";
+import { basePrompt as reactBasePrompt } from "./defaults/react";
 
-async function main() {
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
+const app = express();
+app.use(express.json());
+
+app.post("/template", async (req: any, res: any) => {
+  try {
+    console.log("Request body:", req.body);
+
+    const prompt = req.body.prompt;
+
+    const headers = {
       Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "deepseek/deepseek-chat-v3-0324:free",
-      messages: [
-        {
-          role: "user",
-          content: "Write the css code for a simple todo web app",
-        },
-      ],
-      stream: true,
-    }),
-  });
+      "HTTP-Referer": "http://localhost:3000",
+      "X-Title": "My App",
+    };
 
-  if (!response.body) {
-    console.error("Response body is null. Cannot stream.");
-    return;
-  }
+    console.log("Making request to OpenRouter...");
 
-  const decoder = new TextDecoder();
-  const reader = response.body.getReader();
-
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-
-    const chunk = decoder.decode(value);
-    const lines = chunk.split("\n").filter(line => line.startsWith("data:"));
-
-    for (const line of lines) {
-      const json = line.replace("data: ", "").trim();
-      if (json === "[DONE]") return;
-      try {
-        const content = JSON.parse(json).choices?.[0]?.delta?.content;
-        if (content) process.stdout.write(content);
-      } catch (e) {
-        // Ignore parse errors
+    const response = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({
+          model: "deepseek/deepseek-chat-v3-0324:free",
+          messages: [
+            {
+              role: "system",
+              content:
+                "Return either node or react based on what do you think this project should be. Only return a single word either 'node' or 'react'. Do not return anything extra",
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+        }),
       }
-    }
-  }
-}
+    );
 
-main();
+    console.log("OpenRouter response status:", response.status); // Debug log
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("OpenRouter API error:", errorText);
+      return res.status(500).json({
+        error: "External API error",
+        details: errorText,
+      });
+    }
+
+    const resData = await response.json();
+    const answer = resData.choices?.[0]?.message?.content?.trim().toLowerCase();
+    console.log("AI answer:", answer); // Debug log
+
+    if (answer === "react") {
+      return res.json({
+        prompts: [
+          BASE_PROMPT,
+          `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
+        ],
+        uiPrompts: [reactBasePrompt],
+      });
+    }
+
+    if (answer === "node") {
+      return res.json({
+        prompts: [
+          BASE_PROMPT,
+          `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
+        ],
+        uiPrompts: [nodeBasePrompt],
+      });
+    }
+
+    // More detailed error response
+    return res.status(400).json({
+      error: "Invalid AI response",
+      receivedAnswer: answer,
+      expectedAnswers: ["react", "node"],
+    });
+  } catch (error: any) {
+    console.error("Server error:", error);
+    return res.status(500).json({
+      error: "Server error",
+      message: error.message,
+    });
+  }
+});
+
+app.post("/chat", async (req: any, res: any) => {
+  const messages = req.body.messages;
+  const headers = {
+    Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+    "Content-Type": "application/json",
+    "HTTP-Referer": "http://localhost:3000",
+    "X-Title": "My App",
+  };
+  const response = await fetch(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify({
+        model: "deepseek/deepseek-chat-v3-0324:free",
+        messages: messages,
+        max_tokens: 8000,
+        system: getSystemPrompt(), // Make sure this function exists
+      }),
+    }
+  );
+  const resData = await response.json();
+  const responseText = resData.choices?.[0]?.message?.content;
+  res.json({
+    response: responseText,
+  });
+});
+
+app.listen(3000, () => {
+  console.log("Server running on port 3000");
+  console.log("API Key configured:", !!process.env.OPENROUTER_API_KEY);
+});

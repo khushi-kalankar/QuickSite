@@ -8,53 +8,95 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
 require("dotenv").config();
-function main() {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c;
+const express_1 = __importDefault(require("express"));
+const prompts_1 = require("./prompts");
+const node_1 = require("./defaults/node");
+const react_1 = require("./defaults/react");
+const app = (0, express_1.default)();
+app.use(express_1.default.json());
+app.post("/template", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d;
+    try {
+        console.log("Request body:", req.body);
+        const prompt = req.body.prompt;
+        // Validate prompt exists
+        if (!prompt) {
+            return res.status(400).json({ error: "Prompt is required in request body" });
+        }
+        // Validate API key exists
+        if (!process.env.OPENROUTER_API_KEY) {
+            console.error("Missing OPENROUTER_API_KEY environment variable");
+            return res.status(500).json({ error: "API key not configured" });
+        }
+        const headers = {
+            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "http://localhost:3000",
+            "X-Title": "My App"
+        };
+        console.log("Making request to OpenRouter...");
         const response = yield fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
-            headers: {
-                Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                "Content-Type": "application/json",
-            },
+            headers: headers,
             body: JSON.stringify({
                 model: "deepseek/deepseek-chat-v3-0324:free",
                 messages: [
                     {
-                        role: "user",
-                        content: "Write the css code for a simple todo web app",
+                        role: "system",
+                        content: "Return either node or react based on what do you think this project should be. Only return a single word either 'node' or 'react'. Do not return anything extra"
                     },
-                ],
-                stream: true,
-            }),
+                    {
+                        role: "user",
+                        content: prompt
+                    }
+                ]
+            })
         });
-        if (!response.body) {
-            console.error("Response body is null. Cannot stream.");
-            return;
+        console.log("OpenRouter response status:", response.status); // Debug log
+        if (!response.ok) {
+            const errorText = yield response.text();
+            console.error("OpenRouter API error:", errorText);
+            return res.status(500).json({
+                error: "External API error",
+                details: errorText
+            });
         }
-        const decoder = new TextDecoder();
-        const reader = response.body.getReader();
-        while (true) {
-            const { value, done } = yield reader.read();
-            if (done)
-                break;
-            const chunk = decoder.decode(value);
-            const lines = chunk.split("\n").filter(line => line.startsWith("data:"));
-            for (const line of lines) {
-                const json = line.replace("data: ", "").trim();
-                if (json === "[DONE]")
-                    return;
-                try {
-                    const content = (_c = (_b = (_a = JSON.parse(json).choices) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.delta) === null || _c === void 0 ? void 0 : _c.content;
-                    if (content)
-                        process.stdout.write(content);
-                }
-                catch (e) {
-                    // Ignore parse errors
-                }
-            }
+        const resData = yield response.json();
+        const answer = (_d = (_c = (_b = (_a = resData.choices) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.message) === null || _c === void 0 ? void 0 : _c.content) === null || _d === void 0 ? void 0 : _d.trim().toLowerCase();
+        console.log("AI answer:", answer); // Debug log
+        if (answer === "react") {
+            return res.json({
+                prompts: [prompts_1.BASE_PROMPT, `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${react_1.basePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
+                uiPrompts: [react_1.basePrompt]
+            });
         }
-    });
-}
-main();
+        if (answer === "node") {
+            return res.json({
+                prompts: [prompts_1.BASE_PROMPT, `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${react_1.basePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`],
+                uiPrompts: [node_1.basePrompt]
+            });
+        }
+        // More detailed error response
+        return res.status(400).json({
+            error: "Invalid AI response",
+            receivedAnswer: answer,
+            expectedAnswers: ["react", "node"]
+        });
+    }
+    catch (error) {
+        console.error("Server error:", error);
+        return res.status(500).json({
+            error: "Server error",
+            message: error.message
+        });
+    }
+}));
+app.listen(3000, () => {
+    console.log("Server running on port 3000");
+    console.log("API Key configured:", !!process.env.OPENROUTER_API_KEY);
+});
