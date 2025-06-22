@@ -1,7 +1,8 @@
 import Editor from '@monaco-editor/react';
+import type { FileItem } from '../types';
 
 interface CodeEditorProps {
-  file:  null;
+  file:FileItem |  null;
 }
 
 export function CodeEditor({ file }: CodeEditorProps) {
