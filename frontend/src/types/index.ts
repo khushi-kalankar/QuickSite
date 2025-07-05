@@ -1,10 +1,12 @@
-export enum StepType {
-    CreateFile,
-    CreateFolder,
-    EditFile,
-    DeleteFile,
-    RunScript
-}
+export const StepType = {
+    CreateFile: 'CreateFile',
+    CreateFolder: 'CreateFolder',
+    EditFile: 'EditFile',
+    DeleteFile: 'DeleteFile',
+    RunScript: 'RunScript',
+} as const;
+
+export type StepType = keyof typeof StepType;
 
 export interface Step {
     id: number;

@@ -3,8 +3,10 @@ import express from "express";
 import { BASE_PROMPT, getSystemPrompt } from "./prompts";
 import { basePrompt as nodeBasePrompt } from "./defaults/node";
 import { basePrompt as reactBasePrompt } from "./defaults/react";
+import cors from "cors";
 
 const app = express();
+app.use(cors());
 app.use(express.json());
 
 app.post("/template", async (req: any, res: any) => {
@@ -73,7 +75,7 @@ app.post("/template", async (req: any, res: any) => {
       return res.json({
         prompts: [
           BASE_PROMPT,
-          `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${reactBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
+          `Here is an artifact that contains all files of the project visible to you.\nConsider the contents of ALL files in the project.\n\n${nodeBasePrompt}\n\nHere is a list of files that exist on the file system but are not being shown to you:\n\n  - .gitignore\n  - package-lock.json\n`,
         ],
         uiPrompts: [nodeBasePrompt],
       });
@@ -109,7 +111,36 @@ app.post("/chat", async (req: any, res: any) => {
       headers: headers,
       body: JSON.stringify({
         model: "deepseek/deepseek-chat-v3-0324:free",
-        messages: messages,
+        messages: [
+          {
+            role: "system",
+            content: `You are QuickSite, an AI assistant that generates code in a specific XML format.
+
+CRITICAL: You must ALWAYS respond with code wrapped in boltArtifact tags. Never use markdown code blocks.
+
+Format your response like this:
+<boltArtifact id="project-files" title="Project Files">
+<boltAction type="file" filePath="server.js">
+const express = require('express');
+// your actual code here
+</boltAction>
+<boltAction type="file" filePath="package.json">
+{
+  "name": "my-app",
+  "dependencies": {}
+}
+</boltAction>
+</boltArtifact>
+
+Rules:
+- Always use <boltArtifact> and <boltAction> tags
+- Never use markdown code blocks (\`\`\`)
+- Put complete, functional code inside boltAction tags
+- Use proper file paths in filePath attribute
+- Generate complete applications, not basic examples`,
+          },
+          ...messages,
+        ],
         max_tokens: 8000,
         system: getSystemPrompt(), // Make sure this function exists
       }),

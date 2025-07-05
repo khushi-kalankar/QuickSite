@@ -9,9 +9,9 @@ interface StepsListProps {
 
 export function StepsList({ steps, currentStep, onStepClick }: StepsListProps) {
   return (
-    <div className="bg-gray-900 rounded-xl shadow-xl p-4 h-full overflow-auto">
+    <div className="bg-gray-900 rounded-xl shadow-xl p-3 h-full overflow-auto">
       <h2 className="text-lg font-semibold mb-4 text-gray-100">Build Steps</h2>
-      <div className="space-y-4">
+      <div className="space-y-3">
         {steps.map((step) => (
           <div
             key={step.id}
@@ -30,7 +30,7 @@ export function StepsList({ steps, currentStep, onStepClick }: StepsListProps) {
               ) : (
                 <Circle className="w-5 h-5 text-gray-600" />
               )}
-              <h3 className="font-medium text-gray-100">{step.title}</h3>
+              <h2 className="font-medium text-gray-100">{step.title}</h2>
             </div>
             <p className="text-sm text-gray-400 mt-2">{step.description}</p>
           </div>
