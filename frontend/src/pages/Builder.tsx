@@ -14,14 +14,17 @@ import { Wand2 } from "lucide-react";
 import { Download } from "lucide-react";
 const BACKEND_URL = import.meta.env.VITE_REACT_APP_BACKEND_BASEURL;
 
-const downloadAsZip = async (files: FileItem[], projectName: string = "quicksite-project") => {
-  const JSZip = (await import('jszip')).default;
+const downloadAsZip = async (
+  files: FileItem[],
+  projectName: string = "quicksite-project"
+) => {
+  const JSZip = (await import("jszip")).default;
   const zip = new JSZip();
-  
+
   const addFilesToZip = (fileItems: FileItem[], currentPath: string = "") => {
-    fileItems.forEach(file => {
+    fileItems.forEach((file) => {
       const fullPath = currentPath ? `${currentPath}/${file.name}` : file.name;
-      
+
       if (file.type === "file") {
         // Add file content to ZIP
         zip.file(fullPath, file.content || "");
@@ -32,15 +35,15 @@ const downloadAsZip = async (files: FileItem[], projectName: string = "quicksite
       }
     });
   };
-  
+
   addFilesToZip(files);
-  
+
   // Generate ZIP file
   const content = await zip.generateAsync({ type: "blob" });
-  
+
   // Create download link
   const url = URL.createObjectURL(content);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = `${projectName}.zip`;
   document.body.appendChild(a);
@@ -282,13 +285,13 @@ export function Builder() {
           <p className="text-sm text-gray-400 mt-1">Prompt: {prompt}</p>
         </div>
         <button
-        onClick={() => downloadAsZip(files, "quicksite-project")}
-        disabled={files.length === 0}
-        className="flex items-center gap-2 bg-green-500 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-1 rounded-lg transition-colors"
-      >
-        <Download size={16} />
-        Download Project
-      </button>
+          onClick={() => downloadAsZip(files, "quicksite-project")}
+          disabled={files.length === 0}
+          className="flex items-center gap-2 bg-green-500 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-1 rounded-lg transition-colors"
+        >
+          <Download size={16} />
+          Download Project
+        </button>
       </header>
 
       <div className="flex-1 overflow-hidden">
@@ -371,8 +374,13 @@ export function Builder() {
             <div className="h-[calc(100%-4rem)]">
               {activeTab === "code" ? (
                 <CodeEditor file={selectedFile} />
-              ) : (
+              ) : webcontainer ? (
                 <PreviewFrame webContainer={webcontainer} files={files} />
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400">
+                  <Loader />
+                  <span className="ml-2">Loading preview...</span>
+                </div>
               )}
             </div>
           </div>
