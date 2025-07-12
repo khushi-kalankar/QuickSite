@@ -4,7 +4,7 @@ import { BASE_PROMPT, getSystemPrompt } from "./prompts";
 import { basePrompt as nodeBasePrompt } from "./defaults/node";
 import { basePrompt as reactBasePrompt } from "./defaults/react";
 import cors from "cors";
-
+const PORT = process.env.PORT || 3000;
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -153,7 +153,7 @@ Rules:
   });
 });
 
-app.listen(3000, () => {
+app.listen(PORT, () => {
   console.log("Server running on port 3000");
   console.log("API Key configured:", !!process.env.OPENROUTER_API_KEY);
 });
