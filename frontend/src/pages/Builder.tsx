@@ -7,12 +7,12 @@ import { CodeEditor } from "../components/CodeEditor";
 import { PreviewFrame } from "../components/PreviewFrame";
 import { type Step, type FileItem, StepType } from "../types";
 import axios from "axios";
-import { BACKEND_URL } from "../config";
 import { parseXml } from "../steps";
 import { useWebContainer } from "../hooks/useWebContainer";
 import { Loader } from "../components/Loader";
 import { Wand2 } from "lucide-react";
 import { Download } from "lucide-react";
+const BACKEND_URL = import.meta.env.VITE_REACT_APP_BACKEND_BASEURL;
 
 const downloadAsZip = async (files: FileItem[], projectName: string = "quicksite-project") => {
   const JSZip = (await import('jszip')).default;

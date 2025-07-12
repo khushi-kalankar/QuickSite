@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Wand2 } from "lucide-react";
-import axios from "axios";
-import { BACKEND_URL } from "../config";
 import { BackgroundGradientAnimation } from "@/components/ui/background-gradient-animation";
 
 export function Home() {
