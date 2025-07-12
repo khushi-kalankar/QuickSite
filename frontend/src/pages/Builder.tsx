@@ -12,7 +12,7 @@ import { useWebContainer } from "../hooks/useWebContainer";
 import { Loader } from "../components/Loader";
 import { Wand2 } from "lucide-react";
 import { Download } from "lucide-react";
-const BACKEND_URL = import.meta.env.VITE_REACT_APP_BACKEND_BASEURL;
+const BACKEND_URL = import.meta.env.VITE_REACT_APP_BACKEND_BASEURL?.replace(/\/+$/, '') || '';;
 
 const downloadAsZip = async (
   files: FileItem[],
