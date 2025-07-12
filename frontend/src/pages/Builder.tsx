@@ -12,6 +12,42 @@ import { parseXml } from "../steps";
 import { useWebContainer } from "../hooks/useWebContainer";
 import { Loader } from "../components/Loader";
 import { Wand2 } from "lucide-react";
+import { Download } from "lucide-react";
+
+const downloadAsZip = async (files: FileItem[], projectName: string = "quicksite-project") => {
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+  
+  const addFilesToZip = (fileItems: FileItem[], currentPath: string = "") => {
+    fileItems.forEach(file => {
+      const fullPath = currentPath ? `${currentPath}/${file.name}` : file.name;
+      
+      if (file.type === "file") {
+        // Add file content to ZIP
+        zip.file(fullPath, file.content || "");
+      } else if (file.type === "folder" && file.children) {
+        // Create folder and recursively add its contents
+        zip.folder(fullPath);
+        addFilesToZip(file.children, fullPath);
+      }
+    });
+  };
+  
+  addFilesToZip(files);
+  
+  // Generate ZIP file
+  const content = await zip.generateAsync({ type: "blob" });
+  
+  // Create download link
+  const url = URL.createObjectURL(content);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${projectName}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
 
 export function Builder() {
   const location = useLocation();
@@ -235,14 +271,24 @@ export function Builder() {
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-black via-zinc-900 to-zinc-800 flex flex-col">
-      <header className="bg-black shadow px-6 py-4">
-        <h1 className="text-xl font-semibold flex items-center gap-2">
-          <Wand2 className="text-blue-400" />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-300 to-purple-900">
-            QuickSite
-          </span>
-        </h1>
-        <p className="text-sm text-gray-400 mt-1">Prompt: {prompt}</p>
+      <header className="bg-black shadow px-6 py-4 flex justify-between">
+        <div>
+          <h1 className="text-xl font-semibold flex items-center gap-2">
+            <Wand2 className="text-blue-400" />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-blue-300 to-purple-900">
+              QuickSite
+            </span>
+          </h1>
+          <p className="text-sm text-gray-400 mt-1">Prompt: {prompt}</p>
+        </div>
+        <button
+        onClick={() => downloadAsZip(files, "quicksite-project")}
+        disabled={files.length === 0}
+        className="flex items-center gap-2 bg-green-500 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-1 rounded-lg transition-colors"
+      >
+        <Download size={16} />
+        Download Project
+      </button>
       </header>
 
       <div className="flex-1 overflow-hidden">
