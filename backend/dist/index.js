@@ -18,6 +18,7 @@ const prompts_1 = require("./prompts");
 const node_1 = require("./defaults/node");
 const react_1 = require("./defaults/react");
 const cors_1 = __importDefault(require("cors"));
+const PORT = process.env.PORT || 3000;
 const app = (0, express_1.default)();
 app.use((0, cors_1.default)());
 app.use(express_1.default.json());
@@ -149,7 +150,7 @@ Rules:
         response: responseText,
     });
 }));
-app.listen(3000, () => {
+app.listen(PORT, () => {
     console.log("Server running on port 3000");
     console.log("API Key configured:", !!process.env.OPENROUTER_API_KEY);
 });
