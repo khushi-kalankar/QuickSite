@@ -1,9 +1,8 @@
-import type { FileItem } from '@/types';
 import { WebContainer } from '@webcontainer/api';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 
 interface PreviewFrameProps {
-  files: FileItem[]; // Use your existing FileItem type
+  files: any[];
   webContainer: WebContainer;
 }
 
@@ -11,96 +10,69 @@ export function PreviewFrame({ files, webContainer }: PreviewFrameProps) {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const mountedRef = useRef(true);
 
   useEffect(() => {
-    mountedRef.current = true;
-    
+    let mounted = true;
+
     async function startServer() {
       try {
         setLoading(true);
         setError(null);
 
-        if (!webContainer) {
-          throw new Error('WebContainer not initialized');
-        }
-
-        console.log('Mounting files...');
+        console.log('Starting installation...');
         
-        // Helper function to flatten file tree and get only files (not folders)
-        const flattenFiles = (items: FileItem[]): FileItem[] => {
-          const result: FileItem[] = [];
-          
-          items.forEach((item) => {
-            if (item.type === 'file' && item.content) {
-              result.push(item);
-            } else if (item.type === 'folder' && item.children) {
-              result.push(...flattenFiles(item.children));
-            }
-          });
-          
-          return result;
-        };
-
-        const flatFiles = flattenFiles(files);
-        
-        // Create properly typed file tree for WebContainer
-        const fileTree: { [key: string]: any } = {};
-        flatFiles.forEach((file: FileItem) => {
-          // Use the full path for the file key
-          const filePath = file.path || file.name;
-          fileTree[filePath] = {
-            file: {
-              contents: file.content || ''
-            }
-          };
-        });
-
-        await webContainer.mount(fileTree);
-
-        // Create package.json if it doesn't exist
-        const hasPackageJson = flatFiles.some((f: FileItem) => f.name === 'package.json');
-        if (!hasPackageJson) {
-          await webContainer.fs.writeFile('/package.json', JSON.stringify({
-            "name": "preview-app",
-            "version": "1.0.0",
-            "scripts": {
-              "dev": "npx serve . -p 3000",
-              "start": "npx serve . -p 3000"
-            }
-          }, null, 2));
-        }
-
-        console.log('Installing dependencies...');
-        
+        // Install dependencies
         const installProcess = await webContainer.spawn('npm', ['install']);
         
+        // Handle install output
+        installProcess.output.pipeTo(new WritableStream({
+          write(data) {
+            console.log('Install output:', data);
+          }
+        }));
+
+        // Wait for installation to complete
         const installExitCode = await installProcess.exit;
         if (installExitCode !== 0) {
           throw new Error(`Installation failed with exit code ${installExitCode}`);
         }
 
-        console.log('Starting server...');
+        console.log('Installation complete, starting dev server...');
 
+        // Start the development server
+        const devProcess = await webContainer.spawn('npm', ['run', 'dev']);
         
-        webContainer.on('server-ready', (port, url) => {
-          console.log(`Server ready on port ${port}, URL: ${url}`);
-          if (mountedRef.current) {
-            setUrl(url);
-            setLoading(false);
+        // Handle dev server output
+        devProcess.output.pipeTo(new WritableStream({
+          write(data) {
+            console.log('Dev server output:', data);
           }
+        }));
+
+        // Listen for server-ready event
+        const serverReadyPromise = new Promise<string>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Server startup timeout'));
+          }, 30000); // 30 second timeout
+
+          webContainer.on('server-ready', (port, url) => {
+            clearTimeout(timeout);
+            console.log(`Server ready on port ${port}, URL: ${url}`);
+            resolve(url);
+          });
         });
 
-        setTimeout(() => {
-          if (mountedRef.current && loading) {
-            setError('Server startup timeout - please try again');
-            setLoading(false);
-          }
-        }, 30000);
+        // Wait for server to be ready
+        const serverUrl = await serverReadyPromise;
+        
+        if (mounted) {
+          setUrl(serverUrl);
+          setLoading(false);
+        }
 
       } catch (err) {
         console.error('Error starting server:', err);
-        if (mountedRef.current) {
+        if (mounted) {
           setError(err instanceof Error ? err.message : 'Failed to start server');
           setLoading(false);
         }
@@ -110,17 +82,16 @@ export function PreviewFrame({ files, webContainer }: PreviewFrameProps) {
     startServer();
 
     return () => {
-      mountedRef.current = false;
+      mounted = false;
     };
-  }, [webContainer, files]);
+  }, [webContainer, files]); // Include files in dependency array
 
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center text-gray-400">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
           <p className="mb-2">Loading...</p>
-          <p className="text-sm">Starting development server...</p>
+          <p className="text-sm">Installing dependencies and starting server...</p>
         </div>
       </div>
     );
@@ -130,14 +101,8 @@ export function PreviewFrame({ files, webContainer }: PreviewFrameProps) {
     return (
       <div className="h-full flex items-center justify-center text-red-400">
         <div className="text-center">
-          <p className="mb-2">Error:</p>
-          <p className="text-sm mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Retry
-          </button>
+          <p className="mb-2">Error starting preview:</p>
+          <p className="text-sm">{error}</p>
         </div>
       </div>
     );
@@ -151,7 +116,6 @@ export function PreviewFrame({ files, webContainer }: PreviewFrameProps) {
         src={url}
         title="Preview"
         className="border-0"
-        allow="cross-origin-isolated"
       />
     </div>
   );
